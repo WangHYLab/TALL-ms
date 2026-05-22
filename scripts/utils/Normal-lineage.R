@@ -4,7 +4,7 @@ library(Seurat)
 library(tidyverse)
 library(ggplot2)
 library(cowplot)
-#### 数据读取、过滤----
+#### load data 
 process<-function(samplename,project = "pj",onlyread=FALSE){
   data<-Read10X_h5(paste0('cellranger/',samplename,'/outs/filtered_feature_bc_matrix.h5'))
   data<-CreateSeuratObject(data,project = project,min.cells = 5,min.features = 500)
@@ -121,7 +121,7 @@ data <- FindClusters(data, resolution = 0.5)
 saveRDS(data,"../data.ctl.rds")
 
 
-#### 画图   ####
+#### plot   ####
 {
   marker<- c("Ptprc","Cd3d","Cd3g","Cd3e",
            "Klrb1c","Itgam","Itgax","Ly76","Ly6a",
@@ -150,7 +150,7 @@ p3<-DimPlot(data, reduction = "umap",group.by = "seurat_clusters",label = T,spli
 ggsave(filename = "../out_ctl/data.ctl.SCT-vf3k.dim30.cluster-sample.pdf",width = 20,height =5)
 
 
-#### singleR 注释  ####
+#### singleR annotation  ####
 {
   library(celldex)
   library(SingleR)
@@ -171,7 +171,7 @@ ggsave(filename = "../out_ctl/data.ctl.SCT-vf3k.dim30.cluster-sample.pdf",width 
 p1<-DimPlot(data, reduction = "umap",group.by = "celltype_singleR_ImmGenData",label = T,label.size = 3,repel = T)+
   theme(plot.margin = margin(1,0,0,0,"cm")) +ggtitle("celltype_singleR_ImmGenData")+BoldTitle()
 
-## 比例
+## ratio
 df<-table(data$orig.ident,data$celltype_singleR_ImmGenData)%>%as.data.frame()
 colnames(df)<-c("Group","Celltype","Num")
 p2<-ggplot(df,aes(x=Group,y=Num,fill=Celltype))+
@@ -317,7 +317,7 @@ ggsave(plot = plot_grid(p1,p2),filename = "../out_ctl/data.ctl.SCT-vf3k.dim30.ce
   p1<-DimPlot(data,group.by = "ident", reduction = "umap",label = T,label.size = 3,repel = T,pt.size = 0.8)+
     theme(plot.margin = margin(1,0,0,0,"cm")) +ggtitle("celltype-cluster")+BoldTitle()
   
-  ## 比例
+  ## ratio
   df<-table(data$orig.ident,data$ident)%>%as.data.frame()
   colnames(df)<-c("Group","Celltype","Num")
   p2<-ggplot(df,aes(x=Group,y=Num,fill=Celltype))+

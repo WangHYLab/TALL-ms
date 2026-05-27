@@ -1,0 +1,16 @@
+VEP	Category
+stop_gained	Nonsense
+stop_lost	Nonsense
+frameshift_variant	Frameshift
+conservative_inframe_insertion	In-frame indel
+missense_variant	Missense
+missense_variant&splice_region_variant	Splice
+splice_region_variant&intron_variant	Splice
+splice_region_variant&synonymous_variant	Splice
+upstream_gene_variant	Regulatory
+downstream_gene_variant	Regulatory
+intron_variant	Regulatory
+non_coding_transcript_exon_variant	Regulatory
+synonymous_variant	Regulatory
+5_prime_UTR_variant	Regulatory
+3_prime_UTR_variant	Regulatory

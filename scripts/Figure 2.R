@@ -485,7 +485,7 @@ saveRDS(seu,"TALL.ccregress.integrate.rds")
 
 
 ### Use TCR to select tall cell
-data<-readRDS("../SCIN.ccregress.integrate.rds")
+data<-readRDS("../TALL.ccregress.integrate.rds")
 data$barcode<-rownames(data@meta.data)
 
 

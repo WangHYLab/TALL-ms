@@ -85,11 +85,13 @@ dev.off()
 #### Figure 5B
 #########################################################################################
 ## IGV view of bigwig files:
-# CUT&Tag Bcl11A(this study)
-# ChIP Runx1(GSE218147) 
-# ChIP H3K27ac(GSE283392)
-## a demo pipline in scripts/utils/ChIP-code.sh
-# note: the demo is for tcf7
+## 1. CUT&Tag Bcl11A (this study)
+## 2. ChIP Runx1(GSE218147) 
+# GSM6735504 and GSM6735505, compared to GSM6735509 and GSM6735510
+# pipline in scripts/utils/Runx1-ChIP.sh
+## 3. ChIP H3K27ac(GSE283392)
+# GSM8661325
+# pipline in scripts/utils/H3K27ac-ChIP-enhancer.sh
 
 
 #########################################################################################

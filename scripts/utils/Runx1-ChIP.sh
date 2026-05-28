@@ -1,17 +1,17 @@
 #!/bin/bash
-prefetch SRR22316123
-prefetch SRR22316122
-prefetch SRR22316118
 prefetch SRR22316117
+prefetch SRR22316118
+prefetch SRR22316122
+prefetch SRR22316123
 
-fastq-dump --split-3 SRR22316123.sra
-fastq-dump --split-3 SRR22316122.sra
-fastq-dump --split-3 SRR22316118.sra
 fastq-dump --split-3 SRR22316117.sra
+fastq-dump --split-3 SRR22316118.sra
+fastq-dump --split-3 SRR22316122.sra
+fastq-dump --split-3 SRR22316123.sra
 
 ls ref_data/GSE218147/*_1.fastq >1
 ls ref_data/GSE218147/*_2.fastq >2
-paste 1 2 >data_tcf.config
+paste 1 2 >data.config
 rm 1 2
 
 
@@ -19,7 +19,7 @@ rm 1 2
 # trim------
 mkdir ./trim
 mkdir ./trim_qc
-cat data_tcf.config | while read id 
+cat data.config | while read id 
 do 
 arr=($id)
 fq1=${arr[0]}
@@ -27,11 +27,11 @@ fq2=${arr[1]}
 trim_galore --phred33 --gzip --no_report_file -q 20 --trim-n -o ref_data/GSE218147/trim --paired $fq1 $fq2
 done
 
-#### mapping_mm10####
-mkdir ./mapping_mm10
-mkdir ./mapping_mm10/bowtie2_summary
+# #### mapping_mm10####
+# mkdir ./mapping_mm10
+# mkdir ./mapping_mm10/bowtie2_summary
 
-cat data_tcf.config | while read id
+cat data.config | while read id
 do
 arr=($id)
 fq1=${arr[0]}
@@ -61,7 +61,7 @@ done
 #### filter and transformat ####
 mkdir ./mapping_mm10/bam
 
-cat data_tcf.config | while read id 
+cat data.config | while read id 
 do 
 arr=($id)
 fq1=${arr[0]}
@@ -79,11 +79,12 @@ done
 
 
 # mkdir ./peakCalling_mm10
-macs3 callpeak -t ref_data/GSE218147/mapping_mm10/bam/SRR22316129_bowtie2.mapped.bam ref_data/GSE218147/mapping_mm10/bam/SRR22316130_bowtie2.mapped.bam \
--c ref_data/GSE218147/mapping_mm10/bam/SRR22316124_bowtie2.mapped.bam ref_data/GSE218147/mapping_mm10/bam/SRR22316125_bowtie2.mapped.bam  ref_data/GSE218147/mapping_mm10/bam/SRR22316126_bowtie2.mapped.bam \
--g mm --bdg -f BAMPE -n Tcf7_macs3 --outdir ref_data/GSE218147/peakCalling_mm10 -q 0.05 2>ref_data/GSE218147/peakCalling_mm10/Tcf7_Peak_summary.txt
+macs3 callpeak \
+    -t ref_data/GSE218147/mapping_mm10/bam/SRR22316123_bowtie2.mapped.bam ref_data/GSE218147/mapping_mm10/bam/SRR22316122_bowtie2.mapped.bam \
+    -c ref_data/GSE218147/mapping_mm10/bam/SRR22316118_bowtie2.mapped.bam ref_data/GSE218147/mapping_mm10/bam/SRR22316117_bowtie2.mapped.bam \
+    -g mm --bdg -f BAMPE -n Runx1_macs3 \
+    --outdir ref_data/GSE218147/peakCalling_mm10 -q 0.05 2>ref_data/GSE218147/peakCalling_mm10/Runx1_Peak_summary.txt
 
-# bedGraph to bigWig
-bedGraphToBigWig  peakCalling_mm10/Tcf7_macs3_treat_pileup.bdg  mm10.fai  Tcf7.bw
+
 
 

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+## analysis for H3K27ac, then compare with Bcl11a ChIP-seq data to find Bcl11a-bound enhancers
+
 # phred check----
 ls -l SRR31588264.fastq| head -1 |awk '{print $9}' >tmp.txt
 cat tmp.txt | while read id

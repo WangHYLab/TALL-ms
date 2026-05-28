@@ -97,9 +97,28 @@ ggsave(filename = "out/Fig.S3B.pdf",width = 15,height = 4)
 #########################################################################################
 #### Fig.S3C
 #########################################################################################
-DotPlot(seu,feature=c("Ptprc","Cd3d","Cd8a","Cd4","Il2ra","Kit","Cd44","Notch1","Hes1","Wnt5b","Mki67","Bcl11a","Bcl11b"
-+ ),cols  = c("lightblue","red"))+coord_flip()+theme(axis.text.x = element_text(angle = -90,vjust = 0.5,hjust = 0))
-ggsave(filename = "out/Fig.S3C marker.pdf",width = 4.5,height = 5)
+library(Seurat)
+library(ggplot2)
+library(patchwork)
+seu <- readRDS("clone.inte.ccr.rds")
+DotPlot(seu,
+  feature = c(
+    # "Ptprc","Cd3d","Cd8a","Cd4","Il2ra","Kit","Cd44","Notch1","Hes1","Wnt5b","Mki67","Bcl11a","Bcl11b"
+    # "Hhex", "Cd44",
+    "Kit", "Il7r", "Il2ra", "Cd4", "Cd8a", "Cd8b1",
+    # "Bcl11a",
+    "Bcl11b", "Notch1",
+    "Rag1", "Rag2", "Gata3", "Dntt", "Cd247", "Ptprc",
+    # "Cd52",
+    "Cd3d",
+    # "Cd3e",
+    "Tcf7"
+    # "Ms4a1", "Cd19"
+  ),
+  cols = c("lightblue", "red")
+) + coord_flip() + theme(axis.text.x = element_text(angle = -90, vjust = 0.5, hjust = 0))
+
+ggsave(filename = "out/Fig.S3C marker.pdf", width = 4.5, height = 5)
 
 
 #########################################################################################

@@ -86,6 +86,7 @@ dev.off()
 #########################################################################################
 ## IGV view of bigwig files:
 ## 1. CUT&Tag Bcl11A (this study)
+# pipline in scripts/utils/Bcl11a-CUT&Tag.sh
 ## 2. ChIP Runx1(GSE218147) 
 # GSM6735504 and GSM6735505, compared to GSM6735509 and GSM6735510
 # pipline in scripts/utils/Runx1-ChIP.sh

@@ -1,423 +1,85 @@
 #########################################################################################
-#### Figure 2A 
+#### Figure 1M
 #########################################################################################
+CD8 <- read.xlsx("data/L-N.CD8.DESeq2.withTPM.xlsx")
 
-# setwd("WES-analysis")
-
-library(ggplot2)
-library(tidyverse)
-library(vcfR)
-library(openxlsx)
-
-## 读取所有样本并整理注释合并
-files<-list.files("out/anno",pattern = ".vcf")
-filter=TRUE
-merge.vcf<-c()
-for (file in files) {
-  out_vcf<-c()
-  vcf<-read.vcfR( paste0("out/anno/",file),verbose = T)
-  tidy_vcf <- vcfR2tidy(vcf)
-  
-  VCF<-tidy_vcf$fix
-  if(filter){
-    VCF<-tidy_vcf$fix %>% filter(FILTER=="PASS")
-  }
-  
-  VCF<-VCF %>% select(CHROM,POS,ID,REF,ALT,FILTER,ANN)
-  VCF$ID<-paste0(VCF$CHROM,"_",VCF$POS,"_",VCF$REF,"_",VCF$ALT)
-  VCF$SAMPLE<-file
-  pb <- txtProgressBar(style=3)
-  for (line in 1:nrow(VCF)) {
-    setTxtProgressBar(pb, line/nrow(VCF),title = paste0("Process sample: ",file))
-    ANNO_ori<-VCF[line,]$ANN
-    # anno:
-    # Allele | Annotation | Annotation_Impact | Gene_Name | Gene_ID | Feature_Type | Feature_ID | Transcript_BioType | Rank | HGVS.c | HGVS.p | cDNA.pos / cDNA.length | CDS.pos / CDS.length | AA.pos / AA.length | Distance | ERRORS / WARNINGS / INFO
-    anno_split<-strsplit(ANNO_ori,",")[[1]]
-    split_strings <- lapply(anno_split, function(x){strsplit(x,split = "\\|")[[1]]})
-    # max_cols <- max(sapply(split_strings, length))
-    max_cols <-16
-    anno_mtx <- do.call(rbind, lapply(split_strings, function(x) c(x, rep(NA, max_cols - length(x)))))
-    colnames(anno_mtx)<-c('Allele',
-                          'Annotation',
-                          'Annotation_Impact', 
-                          'Gene_Name', 
-                          'Gene_ID', 
-                          'Feature_Type', 
-                          'Feature_ID', 
-                          'Transcript_BioType', 
-                          'Rank', 
-                          'HGVS.c', 
-                          'HGVS.p', 
-                          'cDNA.pos / cDNA.length',
-                          'CDS.pos / CDS.length', 
-                          'AA.pos / AA.length', 
-                          'Distance', 
-                          'ERRORS / WARNINGS / INFO')
-    rep_len<-nrow(anno_mtx)
-    vcf<-c()
-    for (i in 1:rep_len) {
-      vcf<-rbind(vcf,VCF[line,])
-    }
-    out_vcf<-rbind(out_vcf,cbind(vcf,anno_mtx))
-    
-  }
-  close(pb)
-  merge.vcf<-rbind(merge.vcf,out_vcf)
-}
-write.xlsx(merge.vcf,file = "further_analysis/merge.filtered.vcf")
-
-merge.vcf<-read.xlsx("further_analysis/merge.filtered.vcf.xlsx")
-
-## 挑选driver gene mutation landscape
-driver_gene<-openxlsx::read.xlsx("further_analysis/28671688-supp.xlsx",sheet = "Table S9 Driver Mutations")
-
-library(homologene)
-gene.use<-human2mouse(driver_gene$Gene)
-gene.use<-gene.use$mouseGene %>% unique()
-
-# gene_mut<-read.table("out/anno/2021.11.19VAFT12.2e2RThymus.snpEff_summary.genes.txt")
-
-vcf<-merge.vcf %>% filter(Gene_Name %in% gene.use) # 关注基因
-vcf<-merge.vcf # 所有基因 
-
-uni_ID<-vcf$ID %>% unique()
-uni_gene<-vcf$Gene_Name %>% unique()
-type<-vcf$Annotation_Impact %>% unique()
-order<-c("HIGH","MODERATE","LOW","MODIFIER")
-df<-data.frame()
-for (gene in uni_gene) {
-  mini_df<-vcf %>% filter(Gene_Name==gene)
-  
-  mini_df$Annotation_Impact<-factor(mini_df$Annotation_Impact, levels = order, ordered = TRUE)
-  mini_df<- mini_df[order(mini_df$Annotation_Impact), ]
-  
-  mut_num<-mini_df$ID %>% unique() %>% length()
-  sample_num<-mini_df$SAMPLE %>% unique() %>% length()
-  
-  d<-mini_df %>% dplyr::select(ID,Gene_Name,Annotation_Impact) %>% distinct(ID,.keep_all = T)
-  high_num<-d %>% filter(Annotation_Impact=="HIGH") %>% nrow()
-  moderate_num<-d %>% filter(Annotation_Impact=="MODERATE") %>% nrow()
-  low_num<-d %>% filter(Annotation_Impact=="LOW") %>% nrow()
-  modifier_num<-d %>% filter(Annotation_Impact=="MODIFIER") %>% nrow()
-  
-  d2<-mini_df %>% dplyr::select(ID,SAMPLE) %>% unique.data.frame()
-  mut_more1_per_sample<-sum((table(d2$ID,d2$SAMPLE) %>% colSums())>1)
-  mut_1_per_sample<-sum((table(d2$ID,d2$SAMPLE) %>% colSums())==1)
-  
-  row<-c(gene,mut_num,sample_num,
-         high_num,moderate_num,low_num,modifier_num,
-         mut_1_per_sample,mut_more1_per_sample)
-  df<-rbind(df,row)
-}
-# df<-data.frame(df)
-colnames(df)<-c('gene','mut_num','sample_num',
-                'high_num','moderate_num','low_num','modifier_num',
-                'mut_1_per_sample','mut_more1_per_sample')
-count_df<-df
-
-df<-df %>% tibble::remove_rownames() %>% tibble::column_to_rownames("gene") 
-library(purrr)
-data<-map_df(df, as.numeric)%>%as.matrix()
-rownames(data)<-rownames(df)
-plot<-data %>% data.frame()%>% arrange(desc(mut_num))%>% arrange(desc(sample_num))
-
-bk <- c(seq(0,max(plot[,3:6]),by=1))
-pdf("out/Fig.2A-1 Mutation number.pdf",width = 4,height = 10)
-pheatmap::pheatmap(plot[1:6],
-                   cluster_rows = F,cluster_cols = F,scale = "none",
-                   display_numbers = T,number_format = "%.0f",fontsize_number = 10,number_color = "black",
-                   # color = "grey",border_color = "white",number_color = "white",
-                   
-                   color = c(colorRampPalette(colors = c("white","red"))(length(bk))),
-                   breaks = bk,
-                   gaps_col = c(2),
-                   labels_col =c("Mutations","Samples",order)
-                   )
-dev.off()
-
-
-df<-plot %>% dplyr::select(mut_1_per_sample,mut_more1_per_sample) %>% tibble::rownames_to_column(.,var = "gene")
-colnames(df)<-c("gene","1 mut/sample","≥2 mut/sample")
-df<-tidyr::pivot_longer(df, 
-                        cols = c(`1 mut/sample`, `≥2 mut/sample`), 
-                        names_to = "%Sample", 
-                        values_to = "Value")
-df$gene<-factor(df$gene,levels = rev(rownames(plot)))
-
-ggplot(df,aes(x=Value,y=gene,fill=`%Sample`))+
-  geom_bar(stat = "identity", position = "fill",width = 0.9, color = "white", size = 0.8)+
-  theme_minimal()+
-  scale_fill_manual(values = c("#3D1F64","#7F7FB8"))+
-  scale_x_continuous( breaks = c(0, 0.5, 1)) 
-ggsave(filename = "out/Fig.2A-2 sample ratio.pdf",width = 4,height = 10)
-
-
-### 增加详细突变类型 20250506 ----
-
-vcf<-merge.vcf %>% filter(Gene_Name %in% gene.use)
-annotation_type<-vcf$Annotation %>% unique()
-mapp<-read.table("further_analysis/CategoryMapping.txt",sep = "\t",header = T)
-vcf<-merge(vcf,mapp,all.x=T,by.x="Annotation",by.y="VEP")
-
-df_cate<-vcf %>% dplyr::select(Gene_Name,ID,Category,Annotation,Annotation_Impact) %>% distinct(ID,.keep_all = T)
-df_cate$Gene_Name<-factor(df_cate$Gene_Name,levels = c(rownames(plot)))
-
-uni_ID<-vcf$ID %>% unique()
-uni_gene<-vcf$Gene_Name %>% unique()
-type<-vcf$Annotation_Impact %>% unique()
-order<-c("HIGH","MODERATE","LOW","MODIFIER")
-
-gene_use<-rownames(plot) #[1:10] #部分基因
-gene_use<-uni_gene    #所有基因
-
-df<-data.frame()
-vcf[vcf$Annotation %in% annotation_type[grep('&',annotation_type)], ]$Annotation<-"complex_type"
-annotation_type<-vcf$Annotation %>% unique()
-for (gene in gene_use) { 
-  mini_df<-vcf %>% filter(Gene_Name==gene)
-  
-  mini_df$Annotation_Impact<-factor(mini_df$Annotation_Impact, levels = order, ordered = TRUE)
-  mini_df<- mini_df[order(mini_df$Annotation_Impact), ]
-  
-  mut_num<-mini_df$ID %>% unique() %>% length()
-  sample_num<-mini_df$SAMPLE %>% unique() %>% length()
-  
-  d<-mini_df %>% dplyr::select(ID,Gene_Name,Annotation) %>% distinct(ID,.keep_all = T)
-  anno<-d$Annotation %>% unique()
-  
-  for (a in anno) {
-    num<-d %>% filter(Annotation==a) %>% nrow()
-    df<-rbind(df,c(gene,a,num))
-  }
-  
-}
-# df<-data.frame(df)
-colnames(df)<-c('gene','Annotation','Num')
-
-mut_df<-df
-wide_df <- pivot_wider(df, 
-                       id_cols = "gene", 
-                       names_from = "Annotation", 
-                       values_from = "Num") %>% tibble::column_to_rownames("gene")
-
-out<-cbind(count_df,wide_df[count_df$gene,])
-write.xlsx(out,file = "Gene.mut.stat&detail.xlsx")
-
-
-df<-mut_df %>% filter(gene %in% rownames(plot))
-df$gene<-factor(df$gene,levels = rev(rownames(plot)))
-df$Annotation<-factor(df$Annotation,levels = c(
-  "missense_variant"    , 
-  "frameshift_variant",   
-  "conservative_inframe_insertion"   ,  
-  "3_prime_UTR_variant" ,
-  "5_prime_UTR_variant",
-  "upstream_gene_variant" ,
-  "downstream_gene_variant",
-  "stop_gained"   ,                          
-  "stop_lost"                        ,        
-  "intron_variant"   ,    
-  "non_coding_transcript_exon_variant"  , 
-  "synonymous_variant"  , 
-  'complex_type'
-))
-
-df$Num<-as.numeric(df$Num)
-ggplot(df,aes(x=gene,y=Num,fill=Annotation))+
-  geom_bar(stat = 'identity',width = 0.8,position = "stack")+
-  scale_fill_manual(values = c("#86BEEC", "#CE403F", "#BEBADA" ,"#FB8072", "#80B1A3", "#FDB462", "#B3DE69" ,"#FCCDE5", "#D9D9D9" ,"#BC80BD", "#CCEBC5","lightblue")
-                                                                                 )+
-  coord_flip()+
-  xlab("")+ylab('Frequency')+
-  theme_classic()+
-  theme(axis.text.y = element_text(size = 12))
-
-ggsave("out/Fig.2A-3 Frequency of mut-type.pdf",width = 6,height = 12)
-
-
-#########################################################################################
-#### Figure 2C 
-#########################################################################################
-setwd("~/Project/YuYong_TALL/zhengjie")
-library(openxlsx)
-library(ComplexHeatmap)
-library(circlize)
-library(seriation)
-library(tidyverse)
-CD8<-read.xlsx("../rna-analysis/analysis/L-N.CD8.DESeq2.withTPM.xlsx")
-expr.cd8<-CD8  %>% distinct(gene,.keep_all = T) %>% tibble::column_to_rownames("gene")
-
-expr.cd8<-log2(expr.cd8[,c(8:16)]+1)
-
-expr<-expr.cd8
-
-annocol<-data.frame(name=colnames(expr),
-                    Condition=lapply(colnames(expr),function(x){str_sub(x,1,1)[[1]]}) %>%as.character()
-                    # Celltype=lapply(colnames(expr),function(x){strsplit(x,split = "_")[[1]][2]}) %>%as.character()
-) %>% tibble::column_to_rownames(colnames(.)[1])
-
-{
-  gene.select<-c('Hes1',
-                 'Ccnd1',
-                 'Notch1',
-                 'Dtx1',
-                 'Lef1',
-                 'Gata3',
-                 'Phf6',
-                 'Myb',
-                 'Myc',
-                 'Stat5a',
-                 # 'Ezh2',
-                 'Cxcr4',
-                 'Cdkn2a',
-                 'Lyl1',
-                 'Lmo1',
-                 'Lmo2',
-                 'Cdk4',
-                 'Cdk6',
-                 'Bmi1',
-                 'Ezh2',
-                 'Pdgfrb',
-                 # Down(15)
-                 'Tet1',
-                 'Tet2',
-                 'Tet3',
-                 'Dnm2',
-                 'Trbv1',
-                 'Trav19',
-                 'Trav14-2',
-                 'Bcl11b',
-                 'Wt1',
-                 'Cdkn1b',
-                 'Spi1',
-                 'Ikzf1',
-                 'Dusp6',
-                 'Socs1',
-                 'Socs3')}
-genes_to_show <- gene.select
-
-expr.plot<-expr[c(
-                  # gene.select,
-                  
-                  CD8 %>% filter(padj<0.001&abs(log2FoldChange)>0.5) %>% 
-                    # head(500) %>% 
-                    pull(gene)
-) %>% unique(),]
-
-# 构造 row_labels 向量
-row_labels <- ifelse(rownames(expr.plot) %in% genes_to_show, rownames(expr.plot), "")
-
-# 绘制热图
-df <-scale(t(expr.plot)) %>% t() %>% na.omit()
-
-ht <- Heatmap(
-  df,
-  name = "Scaled\nexpression",
-  # row_order = get_order(o1), column_order = get_order(o2),
-  # row_labels = row_labels,  # 仅显示指定基因的行名
-  row_km = 2,               # 可选：行聚类分组
-  column_km = 2,            # 可选：列聚类分组
-  cluster_rows = T,
-  cluster_columns = T,
-  clustering_method_columns = "ward.D2",
-  # clustering_method_rows = "ward.D2",
-  show_column_names = TRUE,
-  show_row_names = TRUE,    # 确保行名显示开启
-  col = colorRamp2(c(-2, 0, 2), c("navy","white","firebrick3")),
-  # col = colorRampPalette(c("navy","white","firebrick3"))(100),
-  row_gap = unit(1.5, "mm"), column_gap = unit(1.5, "mm"), border = TRUE,
-  top_annotation = columnAnnotation(df = annocol,
-                                    col=list(Condition=c("L"="#9BC900","N"="#F69389"))),
-)
-genes <- c(genes_to_show
-           # CD8 %>% filter(abs(log2FoldChange)>3)%>% head(20) %>% pull(gene)
-           ) %>% unique()
-genes <- as.data.frame(genes)
-ht<-ht + rowAnnotation(link = anno_mark(at = which(rownames(expr.plot) %in% genes$genes), 
-                                        labels = rownames(expr.plot)[which(rownames(expr.plot) %in% genes$genes)], 
-                                        labels_gp = gpar(fontsize = 10)))
-ht_opt$message = FALSE
-# col_fun = colorRamp2(c(0, 5, 10), c("blue", "white", "red"))
-# ht= HeatmapAnnotation(foo = 1:10, col = list(foo = col_fun))
-# 显示热图
-pdf("out/Fig.2B Heatmap.pdf",width = 6.5,height = 8)
-draw(ht)
-dev.off()
-
-
-#########################################################################################
-#### Figure 2D 
-#########################################################################################
-CD8<-read.xlsx("../rna-analysis/analysis/L-N.CD8.DESeq2.withTPM.xlsx")
-
-df<-CD8 %>% dplyr::select(gene,log2FoldChange) %>% distinct(gene,.keep_all = T) %>% 
-  arrange(desc(log2FoldChange)) %>% na.omit()
-geneList <- setNames(df$log2FoldChange, df$gene)  
+df <- CD8 %>%
+    dplyr::select(gene, log2FoldChange) %>%
+    distinct(gene, .keep_all = T) %>%
+    arrange(desc(log2FoldChange)) %>%
+    na.omit()
+geneList <- setNames(df$log2FoldChange, df$gene)
 
 
 library(clusterProfiler)
 library(msigdbr)
 library(enrichplot)
 
-path<-msigdbr(species = "Homo sapiens", category = "C2", subcategory = "KEGG") %>% dplyr::select(gs_name,gene_symbol)
-trans<-path$gene_symbol %>% unique() %>% human2mouse()
+path <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "KEGG") %>% dplyr::select(gs_name, gene_symbol)
+trans <- path$gene_symbol %>%
+    unique() %>%
+    human2mouse()
 
-path<-merge(path,trans,all.x=T,by.x="gene_symbol",by.y="humanGene")
+path <- merge(path, trans, all.x = T, by.x = "gene_symbol", by.y = "humanGene")
 
-path<-path %>% dplyr::select(gs_name,mouseGene) %>% na.omit()
+path <- path %>%
+    dplyr::select(gs_name, mouseGene) %>%
+    na.omit()
 
 
-res<-clusterProfiler::GSEA(geneList,TERM2GENE = path,pvalueCutoff=1)
+res <- clusterProfiler::GSEA(geneList, TERM2GENE = path, pvalueCutoff = 1)
 
-gsea<-res@result
-write.xlsx(res@result,file = "../rna-analysis/analysis/L-N.CD8.GSEA-KEGG.xlsx")
+gsea <- res@result
+write.xlsx(res@result, file = "data/L-N.CD8.GSEA-KEGG.xlsx")
 
-path_id<-"KEGG_CELL_CYCLE"
-plot_gsea<-function(path_id){
-  
-  title<-paste0(path_id,"\n",
-                "NES = ",res@result %>% filter(ID==path_id)%>% pull(NES) %>% signif(.,2),"\t",
-                "p-value = ",res@result %>% filter(ID==path_id)%>% pull(pvalue) %>% signif(.,2),"\t",
-                "adjusted p-value = ",res@result %>% filter(ID==path_id)%>% pull(p.adjust) %>% signif(.,2)
-                )
-  gseaplot2(x = res,geneSetID = path_id,title = title,pvalue_table = F,color = "darkred",subplots = 1:2)
-  ggsave(filename = paste0("out/Fig.2D ",path_id,".pdf"),width = 5.5,height = 3.2)
+path_id <- "KEGG_CELL_CYCLE"
+plot_gsea <- function(path_id) {
+    title <- paste0(
+        path_id, "\n",
+        "NES = ", res@result %>% filter(ID == path_id) %>% pull(NES) %>% signif(., 2), "\t",
+        "p-value = ", res@result %>% filter(ID == path_id) %>% pull(pvalue) %>% signif(., 2), "\t",
+        "adjusted p-value = ", res@result %>% filter(ID == path_id) %>% pull(p.adjust) %>% signif(., 2)
+    )
+    gseaplot2(x = res, geneSetID = path_id, title = title, pvalue_table = F, color = "darkred", subplots = 1:2)
+    ggsave(filename = paste0("out/Fig.2D ", path_id, ".pdf"), width = 5.5, height = 3.2)
 }
 
 lapply(c(
-  "KEGG_CELL_CYCLE", # 1
-  "KEGG_CHEMOKINE_SIGNALING_PATHWAY", # 3
-  "KEGG_T_CELL_RECEPTOR_SIGNALING_PATHWAY",
-  "KEGG_TOLL_LIKE_RECEPTOR_SIGNALING_PATHWAY",
-  "HALLMARK_APOPTOSIS", 
-  "KEGG_NOTCH_SIGNALING_PATHWAY", 
-  "KEGG_HEDGEHOG_SIGNALING_PATHWAY"
+    "KEGG_CELL_CYCLE", # 1
+    "KEGG_CHEMOKINE_SIGNALING_PATHWAY", # 3
+    "KEGG_T_CELL_RECEPTOR_SIGNALING_PATHWAY",
+    "KEGG_TOLL_LIKE_RECEPTOR_SIGNALING_PATHWAY",
+    "HALLMARK_APOPTOSIS",
+    "KEGG_NOTCH_SIGNALING_PATHWAY",
+    "KEGG_HEDGEHOG_SIGNALING_PATHWAY"
 ), FUN = plot_gsea)
 
 ## HALLMARK ----
-path_MH<-msigdbr(species = "Mus musculus", category = "H") %>% dplyr::select(gs_name,gene_symbol)
-res2<-clusterProfiler::GSEA(geneList,TERM2GENE = path_MH,pvalueCutoff=1)
+path_MH <- msigdbr(species = "Mus musculus", category = "H") %>% dplyr::select(gs_name, gene_symbol)
+res2 <- clusterProfiler::GSEA(geneList, TERM2GENE = path_MH, pvalueCutoff = 1)
 
-gsea2<-res2@result
-write.xlsx(res2@result,file = "../rna-analysis/analysis/L-N.CD8.GSEA-HALLMARK.xlsx")
+gsea2 <- res2@result
+write.xlsx(res2@result, file = "data/rna-analysis/analysis/L-N.CD8.GSEA-HALLMARK.xlsx")
 
-plot_gsea2<-function(path_id){
-  
-  title<-paste0(path_id,"\n",
-                "NES = ",res2@result %>% filter(ID==path_id)%>% pull(NES) %>% signif(.,2),"\t",
-                "p-value = ",res2@result %>% filter(ID==path_id)%>% pull(pvalue) %>% signif(.,2),"\t",
-                "adjusted p-value = ",res2@result %>% filter(ID==path_id)%>% pull(p.adjust) %>% signif(.,2)
-  )
-  gseaplot2(x = res2,geneSetID = path_id,title = title,pvalue_table = F,color = "darkred",subplots = 1:2)
-  ggsave(filename = paste0("out/Fig.2D ",path_id,".pdf"),width = 5.5,height = 3.2)
+plot_gsea2 <- function(path_id) {
+    title <- paste0(
+        path_id, "\n",
+        "NES = ", res2@result %>% filter(ID == path_id) %>% pull(NES) %>% signif(., 2), "\t",
+        "p-value = ", res2@result %>% filter(ID == path_id) %>% pull(pvalue) %>% signif(., 2), "\t",
+        "adjusted p-value = ", res2@result %>% filter(ID == path_id) %>% pull(p.adjust) %>% signif(., 2)
+    )
+    gseaplot2(x = res2, geneSetID = path_id, title = title, pvalue_table = F, color = "darkred", subplots = 1:2)
+    ggsave(filename = paste0("out/Fig.1M ", path_id, ".pdf"), width = 5.5, height = 3.2)
 }
-lapply("HALLMARK_MTORC1_SIGNALING",FUN = plot_gsea2)
+lapply("HALLMARK_MTORC1_SIGNALING", FUN = plot_gsea2)
+lapply(gsea2$ID[1:20], FUN = plot_gsea2)
+
+
 
 #########################################################################################
-#### Figure 2E 
+#### Figure 1N
 #########################################################################################
 
-# 
 ### sc analysis to clone.inte.ccr.rds
 source("script/funcs.R")
 library(Seurat)
@@ -443,7 +105,7 @@ data.list<-list(DN1=DN_1,
                 Thy2=Thy_2,
                 DN5=DN_5,
                 Thy5=Thy_5)
-saveRDS(data.list,"../data.list.filtered&removeDB.rds")
+saveRDS(data.list, "data/data.list.filtered&removeDB.rds")
 
 seu <- merge(data.list$DN1,c(data.list$DN2,data.list$Thy1,data.list$Thy2))
 
@@ -481,15 +143,15 @@ seu <- RunUMAP(seu, dims = 1:20, reduction = "integrated.cca")
 seu <- FindNeighbors(seu,dims = 1:20,reduction = "integrated.cca")
 seu <- FindClusters(seu,resolution = 0.8)
 DimPlot(seu)
-saveRDS(seu,"TALL.ccregress.integrate.rds")
+saveRDS(seu, "data/TALL.ccregress.integrate.rds")
 
 
 ### Use TCR to select tall cell
-data<-readRDS("../TALL.ccregress.integrate.rds")
+data <- readRDS("data/TALL.ccregress.integrate.rds")
 data$barcode<-rownames(data@meta.data)
 
 
-data.tcr<-readRDS("../data.tcr.rds")
+data.tcr <- readRDS("data/data.tcr.rds")
 DN_1<-data.tcr$DN_1
 DN_2<-data.tcr$DN_2
 Thy_1<-data.tcr$Thy_1
@@ -579,7 +241,7 @@ seu<-RenameIdents(seu,
                   "9"="CD8+ (other)",
                   "10"="CD8+ (other)"
                   )
-saveRDS(seu,"clone.inte.ccr.rds")
+saveRDS(seu, "data/clone.inte.ccr.rds")
 
 ### TCR data
 DN_1_contig<-read.csv("cellranger/20221123_DN_TCR/outs/filtered_contig_annotations.csv")
@@ -587,7 +249,7 @@ DN_2_contig<-read.csv("cellranger/20221127_DN_TCR/outs/filtered_contig_annotatio
 Thy_1_contig<-read.csv("cellranger/20221123_Thy_TCR/outs/filtered_contig_annotations.csv")
 Thy_2_contig<-read.csv("cellranger/20221127_Thy_TCR/outs/filtered_contig_annotations.csv")
 data.tcr<-list(DN_1=DN_1_contig,DN_2=DN_2_contig,Thy_1=Thy_1_contig,Thy_2=Thy_2_contig)
-saveRDS(data.tcr,"data.tcr.rds")
+saveRDS(data.tcr, "data/data.tcr.rds")
 
 ### run slingshot
 library(slingshot)
@@ -600,12 +262,12 @@ library(tidyverse)
 library(grDevices)
 library(ggthemes)
 library(Seurat)
-data<-readRDS("clone.inte.ccr.rds")
+data<-readRDS("data/clone.inte.ccr.rds")
 
 
 sce <- as.SingleCellExperiment(data,assay = "RNA")
 sce <- slingshot(sce, clusterLabels = 'ident', reducedDim = 'UMAP', start.clus= "DN2 (11)",end.clus=c("CD8+ (other)"))
-saveRDS(sce,"clone.slingshot.rds")
+saveRDS(sce, "data/clone.slingshot.rds")
 
 #设置颜色
 cell_pal <- function(cell_vars, colors,...) {
@@ -615,7 +277,7 @@ cell_pal <- function(cell_vars, colors,...) {
 }
 
 cell_colors <- cell_pal(sce$ident, scales::hue_pal()(9))
-pdf(file = "out/Fig.2E clone.slngshot.pdf",width = 5,height = 5)
+pdf(file = "out/Fig.1N clone.slngshot.pdf",width = 5,height = 5)
 plot(reducedDims(sce)$UMAP, col = cell_colors,pch=16, asp = 1, cex = 0.4)
 lines(SlingshotDataSet(sce), lwd=2, col='black',type = "lineages")
 
@@ -628,8 +290,9 @@ dev.off()
 
 
 
+
 #########################################################################################
-#### Figure 2F
+#### Figure 1O
 #########################################################################################
 
 ### extracting the gene expression matrix from the Seurat
@@ -637,9 +300,9 @@ library(Seurat)
 library(tidyverse)
 
 ### load data
-seu <- readRDS("clone.inte.ccr.rds") ## scripts\Figure 2.R  in Fig.2E
+seu <- readRDS("data/clone.inte.ccr.rds") ## scripts\Figure 2.R  in Fig.2E
 # DimPlot(seu)
-ctl <- readRDS("data.ctl.assigned.rds") ## scripts\utils\Normal-lineage.R
+ctl <- readRDS("data/data.ctl.assigned.rds") ## scripts\utils\Normal-lineage.R
 # DimPlot(ctl, group.by = "orig.ident")
 
 ctl_use <- subset(ctl, orig.ident %in% c("DN", "THY"))
@@ -672,21 +335,21 @@ normal@reductions
 ### merge data
 data <- merge(seu, normal)
 data <- JoinLayers(data, assay = "RNA", layers = "counts")
-saveRDS(data, "~/merge_ctl&clone.rds")
+saveRDS(data, "data/merge_ctl&clone.rds")
 # for pyscenic
 count <- LayerData(data, layer = "count")
 count <- t(as.matrix(count))
 
-write.csv(count, file = "for.scenic.count.ctl-tall.csv")
+write.csv(count, file = "data/for.scenic.count.ctl-tall.csv")
 
 ### Run pyscenic:  scripts\utils\pySCENIC.sh
 
 
 ### plot
 ## cell assign check for merge_ctl&clone.rds
-data <- readRDS("merge_ctl&clone.rds")
+data <- readRDS("data/merge_ctl&clone.rds")
 {
-  data <- readRDS("merge_ctl&clone.rds")
+  data <- readRDS("data/merge_ctl&clone.rds")
 
   DimPlot(data)
   normal <- subset(data, orig.ident %in% c("N_DN", "N_THY"))
@@ -766,7 +429,7 @@ data <- readRDS("merge_ctl&clone.rds")
 
   # ggsave("Normal.celltype.marker.2.pdf",width = 5,height = 4.5)
 
-  saveRDS(seu, "normal.scenic.RDS")
+  saveRDS(seu, "data/normal.scenic.RDS")
 } # code to get normal.scenic.RDS, which is to run SCENIC in normal samples(DN & Thy)
 
 #### SCENIC regulon activity plot
@@ -790,7 +453,7 @@ library(circlize)
 library(RcisTarget)
 
 ## 1.extract out_SCENIC.loom data
-loom <- open_loom("aucell_output.loom")
+loom <- open_loom("data/aucell_output.loom")
 
 regulons_incidMat <- get_regulons(loom, column.attr.name = "Regulons")
 regulons_incidMat[1:4, 1:4]
@@ -834,9 +497,9 @@ sub_regulonAUC[1:4, 1:4]
 
 # save
 save(sub_regulonAUC, cellTypes, cellClusters, data,
-  file = "~/Project/YuYong_TALL/out/SCENIC_ourData/for_rss_and_visual.Rdata"
+  file = "data/for_rss_and_visual.Rdata"
 )
-load("~/Project/YuYong_TALL/out/SCENIC_ourData/for_rss_and_visual.Rdata")
+load("data/for_rss_and_visual.Rdata")
 
 
 ### 画图
@@ -870,7 +533,7 @@ dim(regulonActivity_byGroup_Scaled)
 # [1] 209   9
 plot <- na.omit(regulonActivity_byGroup_Scaled)
 
-pdf("~/Project/YuYong_TALL/out/SCENIC_ourData/Fig.2F TF.all.pdf", width = 5.2, height = 20)
+# pdf("~/Project/YuYong_TALL/out/SCENIC_ourData/Fig.1O TF.all.pdf", width = 5.2, height = 20)
 Heatmap(
   plot,
   name = "z-score",
@@ -886,7 +549,7 @@ Heatmap(
   cluster_columns = FALSE
 )
 
-dev.off()
+# dev.off()
 
 
 
@@ -997,6 +660,6 @@ plot_heatmap <- function(regulonsToPlot) {
   return(ht)
 }
 
-pdf("out/Fig.2F TF regulon.pdf", width = 5.2, height = 8)
+pdf("out/Fig.1O TF regulon.pdf", width = 5.2, height = 8)
 draw(ht)
 dev.off()

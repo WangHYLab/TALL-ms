@@ -1,5 +1,5 @@
 #########################################################################################
-#### Fig.S1E
+#### Fig.S1F
 #########################################################################################
 
 setwd("out/")
@@ -90,5 +90,5 @@ p2
 
 library(patchwork)
 p1/p2
-ggsave(plot=p1/p2,filename = "out/Fig.S1D TCR top10 FlowBar.pdf",width = 10,height = 8)
+ggsave(plot=p1/p2,filename = "out/Fig.S1F TCR top10 FlowBar.pdf",width = 10,height = 8)
 

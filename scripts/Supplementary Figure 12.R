@@ -1,7 +1,7 @@
 #########################################################################################
-#### Fig.S9B
+#### Fig.S12B
 #########################################################################################
-setwd("ov-analysis/analysis/")
+# setwd("ov-analysis/analysis/")
 
 library(tidyverse)
 library(ggplot2)
@@ -13,12 +13,12 @@ library(org.Mm.eg.db)
 library(eulerr)
 
 
-deg_OV_egfp_OV_td<-read.xlsx("OV.EGFP-TD.DESeq2.withTPM.xlsx") %>% dplyr::select(gene,log2FoldChange,padj)
+deg_OV_egfp_OV_td<-read.xlsx("data/OV.EGFP-TD.DESeq2.withTPM.xlsx") %>% dplyr::select(gene,log2FoldChange,padj)
 
 OV_egfp_td.up<-deg_OV_egfp_OV_td %>% filter(log2FoldChange>0.1) %>% filter(padj<0.05) %>% pull(gene)
 OV_egfp_td.dn<-deg_OV_egfp_OV_td %>% filter(log2FoldChange< -0.1) %>% filter(padj<0.05) %>% pull(gene)
 
-deg_ctl_egfp_ctl_td<-read.xlsx("CTL.EGFP-TD.DESeq2.withTPM.xlsx") %>% dplyr::select(gene,log2FoldChange,padj)
+deg_ctl_egfp_ctl_td<-read.xlsx("data/CTL.EGFP-TD.DESeq2.withTPM.xlsx") %>% dplyr::select(gene,log2FoldChange,padj)
 
 ctl_egfp_td.up<-deg_ctl_egfp_ctl_td %>% filter(log2FoldChange>0.1) %>% filter(padj<0.05) %>% pull(gene)
 ctl_egfp_td.dn<-deg_ctl_egfp_ctl_td %>% filter(log2FoldChange< -1) %>% filter(padj<0.05) %>% pull(gene)
@@ -61,11 +61,11 @@ dn.res<-dn.go@result
 up.sig<-up.res %>% filter(pvalue<0.05) %>% filter(p.adjust<0.05)
 dn.sig<-dn.res %>% filter(pvalue<0.05) %>% filter(p.adjust<0.05)
 
-write.xlsx(list(up=up.sig,dn=dn.sig),file = "OV.EGFP-TD.DEG.overlap.GO.enrichment.padj0.05.0603.xlsx",quote = FALSE)
+write.xlsx(list(up = up.sig, dn = dn.sig), file = "data/OV.EGFP-TD.DEG.overlap.GO.enrichment.padj0.05.0603.xlsx", quote = FALSE)
 
 ## selected pathway 
 
-path<-read.xlsx("OV.EGFP-TD.DEG.overlap.GO.enrichment.padj0.05.0603.xlsx",sheet = "plot")
+path<-read.xlsx("data/OV.EGFP-TD.DEG.overlap.GO.enrichment.padj0.05.0603.xlsx",sheet = "plot")
 path.up<-path %>% filter(Class=="UP") %>% arrange(qvalue)
 
 path.dn_T<-path %>% filter(Category=="T-cell differentiation and activation") %>% arrange(qvalue)
@@ -138,13 +138,144 @@ ggplot(df,aes(y=Description,x=-log10(qvalue),label=Description,fill=Category))+
     plot.margin = margin(0.5,5,0.5,0.5,"cm")
   ) +
   scale_y_discrete(expand = c(0.05, 0.4))  
-ggsave(filename = "out/Fig.S9B OV.EGFP-TD.deg.overlap.GO.pdf",width = 8,height = 8)  
+ggsave(filename = "out/Fig.S12B OV.EGFP-TD.deg.overlap.GO.pdf",width = 8,height = 8)  
 
 
 
 
 #########################################################################################
-#### Fig.S9C
+#### Fig.S12C
+#########################################################################################
+setwd("~/Project/YuYong_TALL/ov-analysis/analysis")
+df<-openxlsx::read.xlsx("EGFP.OV-CTL.DESeq2.withTPM.xlsx")
+
+# 富集
+run_gsea<-function(deseq2_res,file_postfix="",write_xlsx=TRUE,merge_save=FALSE){
+  library(GSEABase) 
+  library(clusterProfiler)
+  library(DOSE)
+  library(org.Mm.eg.db)
+  library(ggplot2)
+  library(stringr)
+  library(dplyr)
+  library(openxlsx)
+  
+  geneList<-deseq2_res$stat
+  names(geneList)=deseq2_res$gene
+  geneList=sort(geneList,decreasing = T)
+  
+  message("Run GSEA in MouseHallmark...")
+  gmt.mh<-read.gmt('data/mh.all.v2023.2.Mm.symbols.gmt')
+  egmt.mh <- GSEA(geneList, TERM2GENE=gmt.mh,eps = 0,seed = 1,nPermSimple=10000,pvalueCutoff = 1)
+  out.mh<-egmt.mh@result
+  message(paste0("Sig path: ",sum(out.mh$pvalue<0.05%>%as.numeric())))
+  
+  message("Run GSEA in Reactome...")
+  gmt.reactome<-read.gmt('data/m2.cp.reactome.v2023.2.Mm.symbols.gmt')
+  egmt.reactome <- GSEA(geneList, TERM2GENE=gmt.reactome,eps = 0,seed = 1,nPermSimple=10000,pvalueCutoff = 1)
+  out.reactome<-egmt.reactome@result
+  message(paste0("Sig path: ",sum(out.reactome$pvalue<0.05%>%as.numeric())))
+  
+  message("Run GSEA in GO...")
+  gmt.go<-read.gmt('data/m5.go.v2023.2.Mm.symbols.gmt')
+  egmt.go <- GSEA(geneList, TERM2GENE=gmt.go,eps = 0,seed = 1,nPermSimple=10000,pvalueCutoff = 1)
+  out.go<-egmt.go@result
+  message(paste0("Sig path: ",sum(out.go$pvalue<0.05%>%as.numeric())))
+  
+  if (write_xlsx) {
+    write.xlsx(x = out.mh, file = paste0("data/", file_postfix, ".gsea.MouseHallmark.xlsx"), overwrite = T)
+    write.xlsx(x = out.reactome, file = paste0("data/", file_postfix, ".gsea.Reactome.xlsx"), overwrite = T)
+    write.xlsx(x = out.go, file = paste0("data/", file_postfix, ".gsea.GO.xlsx"), overwrite = T)
+  }
+  if(merge_save){
+    write.xlsx(x = list(
+      hallmark=out.mh,
+      reactome=out.reactome,
+      go=out.go
+    ),file = paste0("data/",file_postfix,".gsea.Hallmark&Reactome&GO.xlsx"),overwrite = T)
+    
+  }
+  
+  return(list(mh=egmt.mh,go=egmt.go,reactome=egmt.reactome))
+}
+gsea.EGFP.OV_CTL<-run_gsea(deseq2_res = df,file_postfix = "EGFP.OV-CTL")
+
+# 可视化
+path.use<-openxlsx::read.xlsx("data/EGFP(OV vs. CTRL).selected.xlsx",sheet = "GO pathways")
+path<-openxlsx::read.xlsx("data/EGFP.OV-CTL.gsea.GO.xlsx")
+
+df<-path %>% filter(ID %in% path.use$ID)
+
+
+df$Description<-make.unique(df$Description, sep = "_")
+df$Description<-factor(df$Description,levels = df$Description)
+
+df$Category<-""
+df[df$NES>0,]$Category<-"Up-regulated"
+df[df$NES<0,]$Category<-"Down-regulated"
+df<-df %>% arrange(desc(Category),qvalues)
+df$Description<-factor(df$Description,levels = df$Description)
+
+
+ggplot(df,aes(y=Description,x=-log10(qvalues),label=Description,fill=Category))+
+  geom_bar(stat = "identity",width = 0.7)+
+  geom_text(
+    aes(x = -log10(qvalues) + 0.1),  # 在柱子右侧添加微小偏移
+    hjust = 0,                      # 左对齐文本（位于柱子右侧）
+    size = 5,                       # 调整文本大小
+    nudge_x = 0.05,                 # 水平偏移量（根据数据范围调整）
+    check_overlap = FALSE            # 可选：避免标签重叠
+  ) +
+  theme_classic()+
+  ylab("Enriched GO terms")+
+  # xlab("-Log10(q value)")+
+  xlab(expression(-Log[10]~ (italic(q)~value))) +  # 关键修改：设置斜体q和下标10
+  # ggtitle(title,subtitle = subtitle)+
+  theme(
+    axis.line.y = element_blank(),
+    axis.title.y = element_text(size = 12),  # 移除y轴标题
+    axis.title.x = element_text(size = 12), 
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_blank(),   # 移除y轴刻度标签
+    axis.ticks.y = element_blank(),   # 移除y轴刻度线
+    plot.margin = margin(0.5,5,0.5,0.5,"cm")
+  ) +
+  scale_y_discrete(expand = c(0.05, 0.4))  # 调整y轴边距
+ggsave(filename = "out/Fig.S12C EGFP.OV-CTL.gsea.GO.pdf",width = 6.5,height = 6)  
+
+
+
+#########################################################################################
+#### Fig.S12D
+#########################################################################################
+expr<-df[,c(1,9:14)]
+gene.use<-openxlsx::read.xlsx("EGFP(OV vs. CTRL).selected.xlsx")
+gene.use <- gene.use$gene
+# manul
+gene.use<-c(
+  'Mef2c',
+  'Lyz2',
+  'Cox4i2',
+  'EgfI7','Ifngr2','Cd81','Tspan32','Pdgfrb','Cd82','Myc','Jun','Fos','Junb','Scin','Deptor','Evl','Rgs1','Ier2','Dusp1',
+  
+  'Ly6d','Tcrg-C1','Tcrg-C4','Tcrg-C2','Mycn','Il7r','Ccl5','Dntt','Emid1','Tubb3','Fyb','Ly6k','Fbxw4','Stip1','Fcerlg',
+  'Cxcr5','Fcer1g','Egfl7'
+)
+
+plot.df<-expr %>% filter(gene %in% gene.use) %>% tibble::column_to_rownames("gene")
+
+plot.df<-plot.df[,c(4:6,1:3)]
+pdf("out/Fig.S12D EGFP(OV vs. CTRL).deg-selected.heatmap.pdf",width = 5,height = 8)
+pheatmap::pheatmap(plot.df,scale = "row",cluster_cols = F)
+dev.off()
+
+
+
+
+
+
+#########################################################################################
+#### Fig.S12E
 #########################################################################################
 setwd("ov-analysis/analysis/")
 
@@ -171,13 +302,13 @@ loc<-rowSums(tpm)!=0
 data.filter<-tpm[loc,]
 data.filter<-log2(data.filter+0.1)
 
-id2gene<-read.table("mm10.id2symbol.txt",header = T,sep = "\t",row.names = 1)
+id2gene<-read.table("data/mm10.id2symbol.txt",header = T,sep = "\t",row.names = 1)
 
 data.filter$gene<-id2gene[rownames(data.filter),]
 
 df<-data.filter %>% distinct(gene,.keep_all = T) %>% tibble::remove_rownames() %>% tibble::column_to_rownames("gene")
 
-data<-read.xlsx("TD.OV-CTL.DESeq2.withTPM.xlsx")
+data <- read.xlsx("data/TD.OV-CTL.DESeq2.withTPM.xlsx")
 # deg1<-data %>% filter(log2FoldChange>1&padj<0.05) %>% arrange(desc(log2FoldChange)) %>% head(30)%>% pull(gene) 
 # deg2<-data %>% filter(log2FoldChange< -1&padj<0.05) %>% arrange(desc(log2FoldChange)) %>% head(30)%>% pull(gene) 
 # deg<-c(deg1,deg2)
@@ -202,11 +333,11 @@ dn.res<-dn.go@result
 up.sig<-up.res %>% filter(pvalue<0.05) %>% filter(p.adjust<0.05)
 dn.sig<-dn.res %>% filter(pvalue<0.05) %>% filter(p.adjust<0.05)
 
-write.xlsx(list(up=up.sig,dn=dn.sig),file = "TD.OV-CTL.DEG.overlap.GO.enrichment.padj0.05.0607.xlsx",quote = FALSE)
+write.xlsx(list(up = up.sig, dn = dn.sig), file = "data/TD.OV-CTL.DEG.overlap.GO.enrichment.padj0.05.0607.xlsx", quote = FALSE)
 
 ## selected pathway
 
-path<-read.xlsx("TD.OV-CTL.DEG.overlap.GO.enrichment.padj0.05.0607.xlsx",sheet = "plot")
+path <- read.xlsx("data/TD.OV-CTL.DEG.overlap.GO.enrichment.padj0.05.0607.xlsx", sheet = "plot")
 
 
 df<- path %>% group_by(Category) %>% arrange(qvalue) %>% slice_head(n=50)
@@ -242,5 +373,5 @@ ggplot(df,aes(y=Description,x=-log10(qvalue),label=Description,fill=Category))+
   ) +
   scale_y_discrete(expand = c(0.05, 0.4))  
 
-ggsave(filename = "out/Fig.S9C TD.OV-CTL.deg.overlap.GO.pdf",width = 6.5,height = 6)  
+ggsave(filename = "out/Fig.S12E TD.OV-CTL.deg.overlap.GO.pdf",width = 6.5,height = 6)  
 

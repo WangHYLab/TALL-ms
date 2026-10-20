@@ -95,7 +95,7 @@ run_gsea<-function(deseq2_res,file_postfix="",write_xlsx=TRUE,merge_save=FALSE){
 ## run DESeq2 and GSEA
 {
     raw_count<-read.table("../gene-count-matrix.txt",check.names = F)
-    colname.new<-lapply(colnames(raw_count),function(x){strsplit(strsplit(x,"/home/zhengjie/Project/YuYong_TALL/ov-analysis/mapping/")[[1]][2],"_")[[1]][1]})%>%as.character()
+    colname.new<-lapply(colnames(raw_count),function(x){strsplit(strsplit(x,"/ov-analysis/mapping/")[[1]][2],"_")[[1]][1]})%>%as.character()
     colnames(raw_count)<-colname.new
     colnames(raw_count)<-sample.re[colnames(raw_count),]
 
@@ -103,7 +103,7 @@ run_gsea<-function(deseq2_res,file_postfix="",write_xlsx=TRUE,merge_save=FALSE){
     raw_count<-round(as.matrix(raw_count))
 
     data<-read.table("../gene-TPM-matrix.txt",check.names = F)
-    colname.new<-lapply(colnames(data),function(x){strsplit(strsplit(x,"/home/zhengjie/Project/YuYong_TALL/ov-analysis/mapping/")[[1]][2],"_")[[1]][1]})%>%as.character()
+    colname.new<-lapply(colnames(data),function(x){strsplit(strsplit(x,"/ov-analysis/mapping/")[[1]][2],"_")[[1]][1]})%>%as.character()
     colnames(data)<-colname.new
     colnames(data)<-sample.re[colnames(data),]
     tpm<-data
@@ -161,23 +161,93 @@ df<-data.filter %>% distinct(gene,.keep_all = T) %>% tibble::remove_rownames() %
 
 data<-read.xlsx("OV.EGFP-TD.DESeq2.withTPM.xlsx")
 deg<-data %>% filter(abs(log2FoldChange)>1&padj<0.05) %>% arrange(desc(log2FoldChange)) %>% pull(gene)
-df<-df[c(select_gene,deg) %>% unique(),c( "CTL_EGFP1", "CTL_EGFP2", "CTL_EGFP3",
-              "CTL_TD1" ,  "CTL_TD2" ,  "CTL_TD3" ,
-              
-              "OV_TD1" ,   "OV_TD2"  ,  "OV_TD3",
-              "OV_EGFP1",  "OV_EGFP2" , "OV_EGFP3" )]
+select_gene <- c(
+  "Hhex",
+  "Egfl7",
+  "Hoxa7",
+  "Bcl11a",
+  "Spi1",
+  "Nfe2",
+  "Ets1",
+  "Tcf12",
+  "Ly6d",
+  "Tcf7",
+  "Lef1",
+  "Gata3",
+  "Il2ra",
+  "Gzma",
+  "Irf8",
+  "Fcer1g",
+  "Tyrobp",
+  "Cd81",
+  'Mef2c',
+  'Scin',
+  'Lyz2',
+  'Egfl7',
+  'Cd81',
+  'Jun',
+  'Tcrg-C1',
+  'Dntt',
+  'Il7r',
+  'Ccl5',
+  'Ly6k'
+)
+sample.re <- read.xlsx("../../ref_data/sample.xlsx", sheet = "bulk") %>% tibble::column_to_rownames(names(.)[1])
 
-pdf(file = "out/Fig.7f OV.EGFP-TD.deg.heatmap.withCTL.pdf",width = 4.5,height = 9)
-bk <- c(seq(-2,2,by=0.01))
-pheatmap::pheatmap(df,scale = "row",
-                   color = c(colorRampPalette(colors = c("navy","white"))(length(bk)/2),
-                             colorRampPalette(colors = c("white","#d23918"))(length(bk)/2)),
-                   cluster_cols = F,cluster_rows =T,
-                   gaps_col = c(6,9),
-                   cutree_rows = 2,
-                   treeheight_row = 20,
-                   # gaps_row = 20
-                   )
+data <- read.table("../gene-TPM-matrix.txt", check.names = F)
+colnames(data)
+colname.new <- lapply(colnames(data), function(x) {
+  strsplit(strsplit(x, "/ov-analysis/mapping/")[[1]][2], "_")[[1]][1]
+}) %>% as.character()
+colnames(data) <- colname.new
+colnames(data) <- sample.re[colnames(data), ]
+
+tpm <- data
+
+loc <- rowSums(tpm) != 0
+data.filter <- tpm[loc, ]
+data.filter <- log2(data.filter + 0.1)
+
+id2gene <- read.table("/home/zhengjie/DATA/mm10.id2symbol.txt", header = T, sep = "\t", row.names = 1)
+
+data.filter$gene <- id2gene[rownames(data.filter), ]
+
+df <- data.filter %>%
+  distinct(gene, .keep_all = T) %>%
+  tibble::remove_rownames() %>%
+  tibble::column_to_rownames("gene")
+
+data <- read.xlsx("OV.EGFP-TD.DESeq2.withTPM.xlsx")
+deg <- data %>%
+  filter(abs(log2FoldChange) > 1 & padj < 0.05) %>%
+  arrange(desc(log2FoldChange)) %>%
+  pull(gene)
+remove.gene <- deg[grep("Rik", deg)]
+deg <- setdiff(deg, remove.gene)
+
+df <- df[c(select_gene, deg) %>% unique(), c(
+  # "CTL_EGFP1", "CTL_EGFP2", "CTL_EGFP3",
+  #             "CTL_TD1" ,  "CTL_TD2" ,  "CTL_TD3" ,
+
+  "OV_TD1", "OV_TD2", "OV_TD3",
+  "OV_EGFP1", "OV_EGFP2", "OV_EGFP3"
+)]
+
+pdf(file = "out/Fig.7f OV.EGFP-TD.deg.heatmap.withCTL.pdf", width = 4.5, height = 9)
+bk <- c(seq(-2, 2, by = 0.01))
+pheatmap::pheatmap(df,
+  scale = "row",
+  color = c(
+    colorRampPalette(colors = c("navy", "white"))(length(bk) / 2),
+    colorRampPalette(colors = c("white", "#d23918"))(length(bk) / 2)
+  ),
+  cluster_cols = F, cluster_rows = T,
+  # gaps_col = c(6,9),
+  gaps_col = c(3),
+  cutree_rows = 2,
+  treeheight_row = 20,
+  # gaps_row = 20
+)
 dev.off()
 
 

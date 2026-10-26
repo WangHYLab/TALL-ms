@@ -1,5 +1,5 @@
 #########################################################################################
-#### Figure 6G
+#### Figure 6F
 #########################################################################################
 setwd("ov-analysis/analysis/")
 # TPM/count file in specific dir
@@ -244,7 +244,7 @@ df <- df[c(select_gene, deg) %>% unique(), c(
     "OV_EGFP1", "OV_EGFP2", "OV_EGFP3"
 )]
 
-pdf(file = "out/Fig.6G OV.EGFP-TD.deg.heatmap.withCTL.pdf", width = 4.5, height = 9)
+pdf(file = "out/Fig.6F OV.EGFP-TD.deg.heatmap.withCTL.pdf", width = 4.5, height = 9)
 bk <- c(seq(-2, 2, by = 0.01))
 pheatmap::pheatmap(df,
     scale = "row",
@@ -265,7 +265,7 @@ dev.off()
 
 
 #########################################################################################
-#### Figure 6H
+#### Figure 6G
 #########################################################################################
 
 ## heatmap
@@ -313,7 +313,7 @@ df.plot <- df[
     )
 ]
 
-pdf(file = "out/Fig.6H TD.OV-CTL.deg.heatmap.withCTL.pdf", width = 4.2, height = 7)
+pdf(file = "out/Fig.6G TD.OV-CTL.deg.heatmap.withCTL.pdf", width = 4.2, height = 7)
 bk <- c(seq(-2, 2, by = 0.01))
 pheatmap::pheatmap(df.plot,
     scale = "row",

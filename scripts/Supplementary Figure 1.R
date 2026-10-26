@@ -1,8 +1,8 @@
 #########################################################################################
-#### Fig.S1F
+#### Fig.S1G
 #########################################################################################
 
-setwd("out/")
+# setwd("out/")
 library(ggplot2)
 library(dplyr)
 library(tidyr)
@@ -90,5 +90,96 @@ p2
 
 library(patchwork)
 p1/p2
-ggsave(plot=p1/p2,filename = "out/Fig.S1F TCR top10 FlowBar.pdf",width = 10,height = 8)
+ggsave(plot=p1/p2,filename = "out/Fig.S1G TCR top10 FlowBar.pdf",width = 10,height = 8)
+
+
+#########################################################################################
+#### Fig.S1H
+#########################################################################################
+
+
+# setwd("~/Project/YuYong_TALL/out/")
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+tcr_dn1<-read.csv("../cellranger/20221123_DN_TCR/outs/clonotypes.csv")
+tcr_dn2<-read.csv("../cellranger/20221127_DN_TCR/outs/clonotypes.csv")
+tcr_dn5<-read.csv("../cellranger/20240126_DN_TCR/clonotypes.csv")
+
+tcr_thy1<-read.csv("../cellranger/20221123_Thy_TCR/outs/clonotypes.csv")
+tcr_thy2<-read.csv("../cellranger/20221127_Thy_TCR/outs/clonotypes.csv")
+tcr_thy5<-read.csv("../cellranger/20240126_Thy_TCR/clonotypes.csv")
+
+table<-read.csv("../cellranger/20221127_DN_TCR/outs/consensus_annotations.csv")
+table2<-read.csv("../cellranger/20221123_Thy_TCR/outs/filtered_contig_annotations.csv")
+
+# 计算D50的函数
+calculate_D50 <- function(abundance) {
+  # 按降序排序
+  r_sorted <- sort(abundance, decreasing = TRUE)
+  J <- sum(r_sorted)
+  if (J == 0) stop("The sum of abundances is zero, cannot calculate D50.")
+  half_J <- J / 2
+  cum_r <- cumsum(r_sorted)
+  # 找到第一个满足累积和 ≥ J/2 的索引
+  C <- which(cum_r >= half_J)[1]
+  S <- length(r_sorted)
+  D50 <- (C / S) * 100
+  return(D50)
+}
+
+# sample_data <- c(50, 30, 15, 5)  # D50应为25
+# calculate_D50(sample_data) 
+
+d50.dn1<-calculate_D50(tcr_dn1$frequency) 
+d50.dn2<-calculate_D50(tcr_dn2$frequency) 
+d50.dn5<-calculate_D50(tcr_dn5$frequency) 
+d50.thy1<-calculate_D50(tcr_thy1$frequency) 
+d50.thy2<-calculate_D50(tcr_thy2$frequency) 
+d50.thy5<-calculate_D50(tcr_thy5$frequency) 
+
+df<-data.frame(group=c('DN_Normal',"DN_TALL","Thy_Normal","Thy_TALL"),
+               type=c("Normal","TALL","Normal","TALL"),
+               D50=c(d50.dn5,mean(c(d50.dn1,d50.dn2)),d50.thy5,mean(c(d50.thy1,d50.thy2))))
+
+ggplot(data = df,aes(x=group,y=D50,fill=type))+
+  geom_bar(stat = "identity",width = 0.6)+
+  theme_classic()+
+  labs(
+    x = "Sample",
+    y = "TCR diversity (D50)",
+    fill = "Type"
+  ) +
+  scale_fill_manual(values = c("Normal" = "#4E79A7", "TALL" = "#E15759")) +
+  theme(
+    axis.text.x = element_text(angle = -30, hjust = 0,size = 12,color = "black"),
+    axis.text.y = element_text(angle = 0, hjust = 0.5,size = 12,color = "black"),
+    axis.title.x  = element_text(size = 14),
+    axis.title.y = element_text(size = 14),
+    legend.position = "right",
+  )
+  
+
+# PLOT
+df_plot <- df %>%
+  separate(group, into = c("main_group", "sub_group"), sep = "_", remove = FALSE)
+
+ggplot(df_plot, aes(x = main_group, y = D50, fill = sub_group)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.65), width = 0.6) +
+  scale_fill_manual(values = c("Normal" = "#4E79A7", "TALL" = "#E15759")) +
+  labs(
+    x = "Group",
+    y = "TCR diversity (D50)",
+    fill = "Type"
+  ) +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(angle = 0, hjust = 0.5,size = 14,color = "black"),
+    axis.text.y = element_text(angle = 0, hjust = 0.5,size = 12,color = "black"),
+    axis.title.x  = element_text(size = 14),
+    axis.title.y = element_text(size = 14),
+    legend.position = "right",
+  )
+ggsave(filename = "out/Fig.S1H TCR.diversity.pdf",width = 4,height = 5)
 

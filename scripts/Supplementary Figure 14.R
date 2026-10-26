@@ -1,5 +1,5 @@
 #########################################################################################
-#### Fig.S12B
+#### Fig.S14D
 #########################################################################################
 # setwd("ov-analysis/analysis/")
 
@@ -138,13 +138,13 @@ ggplot(df,aes(y=Description,x=-log10(qvalue),label=Description,fill=Category))+
     plot.margin = margin(0.5,5,0.5,0.5,"cm")
   ) +
   scale_y_discrete(expand = c(0.05, 0.4))  
-ggsave(filename = "out/Fig.S12B OV.EGFP-TD.deg.overlap.GO.pdf",width = 8,height = 8)  
+ggsave(filename = "out/Fig.S14D OV.EGFP-TD.deg.overlap.GO.pdf",width = 8,height = 8)  
 
 
 
 
 #########################################################################################
-#### Fig.S12C
+#### Fig.S14E
 #########################################################################################
 setwd("~/Project/YuYong_TALL/ov-analysis/analysis")
 df<-openxlsx::read.xlsx("EGFP.OV-CTL.DESeq2.withTPM.xlsx")
@@ -241,12 +241,12 @@ ggplot(df,aes(y=Description,x=-log10(qvalues),label=Description,fill=Category))+
     plot.margin = margin(0.5,5,0.5,0.5,"cm")
   ) +
   scale_y_discrete(expand = c(0.05, 0.4))  # 调整y轴边距
-ggsave(filename = "out/Fig.S12C EGFP.OV-CTL.gsea.GO.pdf",width = 6.5,height = 6)  
+ggsave(filename = "out/Fig.S14E EGFP.OV-CTL.gsea.GO.pdf",width = 6.5,height = 6)  
 
 
 
 #########################################################################################
-#### Fig.S12D
+#### Fig.S14F
 #########################################################################################
 expr<-df[,c(1,9:14)]
 gene.use<-openxlsx::read.xlsx("EGFP(OV vs. CTRL).selected.xlsx")
@@ -265,7 +265,7 @@ gene.use<-c(
 plot.df<-expr %>% filter(gene %in% gene.use) %>% tibble::column_to_rownames("gene")
 
 plot.df<-plot.df[,c(4:6,1:3)]
-pdf("out/Fig.S12D EGFP(OV vs. CTRL).deg-selected.heatmap.pdf",width = 5,height = 8)
+pdf("out/Fig.S14F EGFP(OV vs. CTRL).deg-selected.heatmap.pdf",width = 5,height = 8)
 pheatmap::pheatmap(plot.df,scale = "row",cluster_cols = F)
 dev.off()
 
@@ -275,7 +275,7 @@ dev.off()
 
 
 #########################################################################################
-#### Fig.S12E
+#### Fig.S14G
 #########################################################################################
 setwd("ov-analysis/analysis/")
 
@@ -373,5 +373,5 @@ ggplot(df,aes(y=Description,x=-log10(qvalue),label=Description,fill=Category))+
   ) +
   scale_y_discrete(expand = c(0.05, 0.4))  
 
-ggsave(filename = "out/Fig.S12E TD.OV-CTL.deg.overlap.GO.pdf",width = 6.5,height = 6)  
+ggsave(filename = "out/Fig.S14G TD.OV-CTL.deg.overlap.GO.pdf",width = 6.5,height = 6)  
 

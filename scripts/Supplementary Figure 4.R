@@ -322,7 +322,7 @@ p2 <- DimPlot(out,
     cols = c("#8DD3C7", "salmon", "#BC80BD")
 ) + ggtitle(label = "")
 p3 <- DimPlot(out, label = TRUE, label.size = 6, repel = TRUE, raster = T, raster.dpi = c(500, 500), pt.size = 0.9, group.by = "cell_type") + ggtitle(label = "")
-# ggsave(plot = p1 + p2 + p3, filename = "Fig.S3C-E normal&tall.cluster&sample&ct.umap.noBcell.raster.pdf", width = 15.5, height = 4.5)
+ggsave(plot = p1 + p2 + p3, filename = "out/Fig.S4C-E normal&tall.cluster&sample&ct.umap.noBcell.raster.pdf", width = 15.5, height = 4.5)
 
 p1 <- DimPlot(out, reduction = "umap", label = TRUE, label.size = 6, pt.size = 0.9, raster.dpi = c(500, 500), group.by = "seurat_clusters") + ggtitle(label = "")
 
